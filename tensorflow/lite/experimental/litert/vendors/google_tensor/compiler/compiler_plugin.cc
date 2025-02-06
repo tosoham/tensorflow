@@ -48,6 +48,28 @@ constexpr const char* kPluginSocModels[] = {
 
 constexpr LiteRtOpCode kSupportedOps[] = {
     kLiteRtOpCodeTflMul,
+    kLiteRtOpCodeTflAdd,
+    kLiteRtOpCodeTflConv2d,
+    kLiteRtOpCodeTflFullyConnected,
+    kLiteRtOpCodeTflSoftmax,
+    kLiteRtOpCodeTflL2Normalization,
+    kLiteRtOpCodeTflL2Pool2d,
+    kLiteRtOpCodeTflLocalResponseNormalization,
+    kLiteRtOpCodeTflLogistic,
+    kLiteRtOpCodeTflLshProjection,
+    kLiteRtOpCodeTflLstm,
+    kLiteRtOpCodeTflMaxPool2d,
+    kLiteRtOpCodeTflRelu,
+    kLiteRtOpCodeTflReluN1To1,
+    kLiteRtOpCodeTflRelu6,
+    kLiteRtOpCodeTflReshape,
+    kLiteRtOpCodeTflResizeBilinear,
+    kLiteRtOpCodeTflRnn,
+    kLiteRtOpCodeTflSoftmax,
+    kLiteRtOpCodeTflSpaceToDepth,
+    kLiteRtOpCodeTflSvdf,
+    kLiteRtOpCodeTflTanh,
+    kLiteRtOpCodeTflConcatEmbeddings,
 };
 // clang format on
 
