@@ -22,6 +22,7 @@
 #include <vector>
 
 #include "absl/status/status.h"
+#include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/string_view.h"
 #include "tensorflow/lite/experimental/litert/c/litert_common.h"
@@ -46,8 +47,47 @@ constexpr const char* kPluginSocModels[] = {
     "P25",
 };  // get the name for plugin soc model
 
-constexpr LiteRtOpCode kSupportedOps[] = {
-    kLiteRtOpCodeTflMul,
+constexpr LiteRtOpCode kUnSupportedOps[] = {
+    kLiteRtOpCodeTflWhere,
+    kLiteRtOpCodeTflVarHandle,
+    kLiteRtOpCodeTflUnsortedSegmentMax,
+    kLiteRtOpCodeTflUnsortedSegmentSum,
+    kLiteRtOpCodeTflUnsortedSegmentMin,
+    kLiteRtOpCodeTflUnsortedSegmentProd,
+    kLiteRtOpCodeTflUnique,
+    kLiteRtOpCodeTflUnidirectionalSequenceRnn,
+    kLiteRtOpCodeTflUnidirectionalSequenceLstm,
+    kLiteRtOpCodeTflSvdf,
+    kLiteRtOpCodeTflSparseToDense,
+    kLiteRtOpCodeTflShape,
+    kLiteRtOpCodeTflSegmentSum,
+    kLiteRtOpCodeTflRfft2d,
+    kLiteRtOpCodeTflReverseSequence,
+    kLiteRtOpCodeTflReduceProd,
+    kLiteRtOpCodeTflReal,
+    kLiteRtOpCodeTflReadVariable,
+    kLiteRtOpCodeTflRandomUniform,
+    kLiteRtOpCodeTflRank,
+    kLiteRtOpCodeTflRandomStandardNormal,
+    kLiteRtOpCodeTflNonMaxSuppressionV4,
+    kLiteRtOpCodeTflNonMaxSuppressionV5,
+    kLiteRtOpCodeTflMultinomial,
+    kLiteRtOpCodeTflMatrixDiag,
+    kLiteRtOpCodeTflMatrixSetDiag,
+    kLiteRtOpCodeTflLocalResponseNormalization,
+    kLiteRtOpCodeTflImag,
+    kLiteRtOpCodeTflHashtableSize,
+    kLiteRtOpCodeTflHashtable,
+    kLiteRtOpCodeTflFakeQuant,
+    kLiteRtOpCodeTflDensify,
+    kLiteRtOpCodeTflConv3d,
+    kLiteRtOpCodeTflConv3dTranspose,
+    kLiteRtOpCodeTflComplexAbs,
+    kLiteRtOpCodeTflCallOnce,
+    kLiteRtOpCodeTflBucketize,
+    kLiteRtOpCodeTflBroadcastArgs,
+    kLiteRtOpCodeTflAssignVariable,
+    kLiteRtOpCodeTflBidirectionalSequenceLstm,
 };
 // clang format on
 
@@ -211,12 +251,12 @@ namespace google_tensor {
 //  TODO(abhirs): update the function to use the darwinn inbuilt way of
 //  finding supportedops
 bool IsOpSupported(const litert::Op& op) {
-  for (auto supported_op : kSupportedOps) {
+  for (auto supported_op : kUnSupportedOps) {
     if (supported_op == op.Code()) {
-      return true;
+      return false;
     }
   }
-  return false;
+  return true;
 }
 
 }  // namespace google_tensor
@@ -281,7 +321,10 @@ LiteRtStatus LiteRtCompilerPluginCompile(
       buffer_str, soc_model_view, &compiled);
 
   if (!compile_status.ok()) {
-    LITERT_LOG(LITERT_ERROR, "Failed to compile model");
+    LITERT_LOG(
+        LITERT_ERROR, "%s",
+        absl::StrCat("Failed to compile model: ", compile_status.message())
+            .c_str());
     return kLiteRtStatusErrorRuntimeFailure;
   }
 
