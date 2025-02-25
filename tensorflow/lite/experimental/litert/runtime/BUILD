@@ -42,6 +42,7 @@ cc_library(
         "dmabuf_buffer.cc",
         "fastrpc_buffer.cc",
         "gl_buffer.cc",
+        "gl_texture.cc",
         "ion_buffer.cc",
         "open_cl_buffer.cc",
         "tensor_buffer.cc",
@@ -52,6 +53,7 @@ cc_library(
         "event.h",
         "fastrpc_buffer.h",
         "gl_buffer.h",
+        "gl_texture.h",
         "ion_buffer.h",
         "open_cl_buffer.h",
         "tensor_buffer.h",
@@ -83,6 +85,7 @@ cc_library(
     ] + gles_deps() + select({
         "//tensorflow:android": [
             "//tensorflow/lite/delegates/gpu/gl:gl_buffer",
+            "//tensorflow/lite/delegates/gpu/gl:gl_texture",
         ],
         "//conditions:default": [],
     }),
@@ -288,6 +291,7 @@ cc_library(
     deps = [
         ":tensor_buffer",
         "//tensorflow/lite/experimental/litert/c:litert_common",
+        "//tensorflow/lite/experimental/litert/c:litert_environment",
         "//tensorflow/lite/experimental/litert/cc:litert_expected",
         "//tensorflow/lite/experimental/litert/cc:litert_macros",
         "//tensorflow/lite/experimental/litert/cc:litert_tensor_buffer_utils",
@@ -309,8 +313,10 @@ cc_test(
         ":tensor_buffer",
         ":tensor_buffer_conversion",
         "//tensorflow/lite/experimental/litert/c:litert_common",
+        "//tensorflow/lite/experimental/litert/c:litert_environment",
         "//tensorflow/lite/experimental/litert/c:litert_model",
         "//tensorflow/lite/experimental/litert/cc:litert_layout",
+        "//tensorflow/lite/experimental/litert/core:environment",
         "//tensorflow/lite/experimental/litert/test:matchers",
         "@com_google_googletest//:gtest_main",
     ] + select({
