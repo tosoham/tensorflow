@@ -21,12 +21,15 @@ limitations under the License.
 
 #include "absl/algorithm/container.h"
 #include "absl/memory/memory.h"
+#include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
+#include "xla/tsl/platform/errors.h"
 #include "xla/tsl/platform/statusor.h"
 #include "tensorflow/core/common_runtime/arg_ret_placement.h"
 #include "tensorflow/core/common_runtime/device.h"
 #include "tensorflow/core/common_runtime/executor.h"
 #include "tensorflow/core/common_runtime/executor_factory.h"
+#include "tensorflow/core/common_runtime/function_body.h"
 #include "tensorflow/core/common_runtime/function_def_utils.h"
 #include "tensorflow/core/common_runtime/gradients.h"
 #include "tensorflow/core/common_runtime/graph_constructor.h"
@@ -37,6 +40,7 @@ limitations under the License.
 #include "tensorflow/core/common_runtime/process_function_library_runtime.h"
 #include "tensorflow/core/common_runtime/rendezvous_mgr.h"
 #include "tensorflow/core/common_runtime/single_threaded_executor.h"
+#include "tensorflow/core/framework/allocator.h"
 #include "tensorflow/core/framework/collective.h"
 #include "tensorflow/core/framework/function.h"
 #include "tensorflow/core/framework/function_handle_cache.h"
@@ -53,6 +57,7 @@ limitations under the License.
 #include "tensorflow/core/lib/core/threadpool.h"
 #include "tensorflow/core/lib/gtl/map_util.h"
 #include "tensorflow/core/platform/macros.h"
+#include "tensorflow/core/platform/mutex.h"
 #include "tensorflow/core/platform/refcount.h"
 #include "tensorflow/core/platform/str_util.h"
 #include "tensorflow/core/profiler/lib/connected_traceme.h"
@@ -346,6 +351,10 @@ class FunctionLibraryRuntimeImpl : public FunctionLibraryRuntime {
   absl::Status Instantiate(const string& function_name, AttrSlice attrs,
                            const InstantiateOptions& options,
                            Handle* handle) override;
+
+  // Finalizes the function library runtime by finalizing the function body of
+  // the instantiated functions.
+  absl::Status Finalize() override;
 
   absl::Status ReleaseHandle(Handle handle) override;
 
@@ -872,6 +881,15 @@ absl::Status FunctionLibraryRuntimeImpl::Instantiate(
   return absl::OkStatus();
 }
 
+absl::Status FunctionLibraryRuntimeImpl::Finalize() {
+  mutex_lock l(mu_);
+  for (auto& [_, item] : *items_) {
+    TF_RETURN_IF_ERROR(item->func_graph->Finalize());
+    item->graph.reset();
+  }
+  return absl::OkStatus();
+}
+
 absl::Status FunctionLibraryRuntimeImpl::ReleaseHandle(Handle handle) {
   LocalHandle h = parent_->GetHandleOnDevice(device_name_, handle);
   if (h == kInvalidLocalHandle) {
@@ -1037,6 +1055,60 @@ absl::Status FunctionLibraryRuntimeImpl::DeleteExecutorStateSync(
   return ReleaseHandle(handle);
 }
 
+namespace {
+
+// Get the alloc attrs for the args obtained from either the nodes or the
+// function body via output parameter.
+void GetAllocAttrsForArgs(const FunctionBody* fbody,
+                          std::vector<AllocatorAttributes>& args_alloc_attrs,
+                          FunctionLibraryRuntime::DoneCallback done) {
+  args_alloc_attrs.clear();
+  args_alloc_attrs.reserve(fbody->arg_nodes.size());
+
+  // Get the alloc attrs for the args from the nodes, if not available in the
+  // function body.
+  if (fbody->arg_types.size() != fbody->args_alloc_attrs.size()) {
+    absl::Status s = full_type::SetAllocAttrsForArgs(
+        fbody->arg_nodes, fbody->arg_types, args_alloc_attrs);
+    if (!s.ok()) {
+      done(s);
+    }
+    return;
+  }
+
+  // Otherwise, use the alloc attrs from the function body.
+  for (const AllocatorAttributes& alloc_attr : fbody->args_alloc_attrs) {
+    args_alloc_attrs.push_back(alloc_attr);
+  }
+}
+
+// Get the alloc attrs for the return values obtained from either the nodes or
+// the function body via output parameter.
+void GetAllocAttrsForRets(const FunctionBody* fbody,
+                          std::vector<AllocatorAttributes>& rets_alloc_attrs,
+                          FunctionLibraryRuntime::DoneCallback done) {
+  rets_alloc_attrs.clear();
+  rets_alloc_attrs.reserve(fbody->ret_nodes.size());
+
+  // Get the alloc attrs for the rets from the nodes, if not available in the
+  // function body.
+  if (fbody->ret_types.size() != fbody->rets_alloc_attrs.size()) {
+    absl::Status s = full_type::SetAllocAttrsForRets(
+        fbody->ret_nodes, fbody->ret_types, rets_alloc_attrs);
+    if (!s.ok()) {
+      done(s);
+    }
+    return;
+  }
+
+  // Otherwise, use the alloc attrs from the function body.
+  for (const AllocatorAttributes& alloc_attr : fbody->rets_alloc_attrs) {
+    rets_alloc_attrs.push_back(alloc_attr);
+  }
+}
+
+}  // namespace
+
 void FunctionLibraryRuntimeImpl::RunRemote(const Options& opts, Handle handle,
                                            absl::Span<const Tensor> args,
                                            std::vector<Tensor>* rets,
@@ -1065,18 +1137,8 @@ void FunctionLibraryRuntimeImpl::RunRemote(const Options& opts, Handle handle,
   ExecutorArgsFromOptions(opts, frame, exec_args);
 
   std::vector<AllocatorAttributes> args_alloc_attrs, rets_alloc_attrs;
-  s = full_type::SetAllocAttrsForArgs(fbody->arg_nodes, fbody->arg_types,
-                                      args_alloc_attrs);
-  if (!s.ok()) {
-    done(s);
-    return;
-  }
-  s = full_type::SetAllocAttrsForRets(fbody->ret_nodes, fbody->ret_types,
-                                      rets_alloc_attrs);
-  if (!s.ok()) {
-    done(s);
-    return;
-  }
+  GetAllocAttrsForArgs(fbody, args_alloc_attrs, done);
+  GetAllocAttrsForRets(fbody, rets_alloc_attrs, done);
 
   bool allow_dead_tensors = opts.allow_dead_tensors;
 
