@@ -16,8 +16,10 @@ limitations under the License.
 #include "tensorflow/core/framework/resource_mgr.h"
 
 #include <memory>
+#include <string>
 #include <vector>
 
+#include "absl/base/nullability.h"
 #include "tensorflow/core/framework/device_attributes.pb.h"
 #include "tensorflow/core/framework/node_def.pb.h"
 #include "tensorflow/core/framework/node_def_util.h"
@@ -55,6 +57,19 @@ class Other : public ResourceBase {
 
  private:
   string label_;
+};
+
+class Finalizable : public ResourceBase {
+ public:
+  explicit Finalizable(absl::Nonnull<int*> finalize_count)
+      : finalize_count_(*finalize_count) {}
+  ~Finalizable() override = default;
+
+  std::string DebugString() const override { return "Finalizable"; }
+  void Finalize() override { ++finalize_count_; }
+
+ private:
+  int& finalize_count_;
 };
 
 template <typename T>
@@ -248,6 +263,19 @@ TEST(ResourceMgrTest, CreateOrLookupRaceCondition) {
   }
   // Resource creator function should always run exactly once.
   EXPECT_EQ(1, atomic_int);
+}
+
+TEST(ResourceMgrTest, Finalize) {
+  ResourceMgr rm;
+
+  int finalize_count_ = 0;
+
+  TF_ASSERT_OK(rm.Create("container", "resource-name",
+                         new Finalizable(&finalize_count_)));
+  EXPECT_EQ(finalize_count_, 0);
+
+  rm.Finalize();
+  EXPECT_EQ(finalize_count_, 1);
 }
 
 absl::Status ComputePolicy(const string& attr_container,

@@ -21,6 +21,7 @@ limitations under the License.
 #include <vector>
 
 #include "absl/container/flat_hash_set.h"
+#include "absl/status/status.h"
 #include "absl/time/time.h"
 #include "absl/types/optional.h"
 #include "tensorflow/core/common_runtime/collective_executor_mgr.h"
@@ -48,6 +49,7 @@ limitations under the License.
 #include "tensorflow/core/framework/logging.h"
 #include "tensorflow/core/framework/metrics.h"
 #include "tensorflow/core/framework/node_def.pb.h"
+#include "tensorflow/core/framework/resource_mgr.h"
 #include "tensorflow/core/framework/run_handler.h"
 #include "tensorflow/core/framework/tensor.h"
 #include "tensorflow/core/framework/versions.pb.h"
@@ -2050,6 +2052,18 @@ absl::Status DirectSession::Finalize() {
   }
   execution_state_.reset();
   flib_def_.reset();
+
+  for (Device* const device : devices_) {
+    if (device == nullptr) {
+      continue;
+    }
+    if (device->resource_manager() == nullptr) {
+      continue;
+    }
+
+    device->resource_manager()->Finalize();
+  }
+
   finalized_ = true;
   return absl::OkStatus();
 }
