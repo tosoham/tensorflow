@@ -1,6 +1,8 @@
+load("@llvm-project//mlir:tblgen.bzl", "gentbl_cc_library")
 load("@local_xla//xla/tsl:tsl.default.bzl", "tsl_pybind_extension")
 load("//tensorflow:pytype.default.bzl", "pytype_strict_library")
 load("//tensorflow:strict.default.bzl", "py_strict_test")
+load("//tensorflow:tensorflow.default.bzl", "get_compatible_with_portable")
 
 package(
     # copybara:uncomment default_applicable_licenses = ["//tensorflow:license"],
@@ -59,4 +61,76 @@ py_strict_test(
         ":stablehlo",
         #internal proto upb dep
     ],
+)
+
+gentbl_cc_library(
+    name = "passes_inc_gen",
+    compatible_with = get_compatible_with_portable(),
+    tbl_outs = [
+        (
+            [
+                "-gen-pass-decls",
+                "-name=OdmlStablehlo",
+            ],
+            "transforms/stablehlo_passes.h.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "transforms/stablehlo_passes.td",
+    deps = ["@llvm-project//mlir:PassBaseTdFiles"],
+)
+
+cc_library(
+    name = "fold_broadcast_pass",
+    srcs = [
+        "transforms/fold_broadcast_pass.cc",
+    ],
+    hdrs = [
+        "transforms/stablehlo_passes.h",
+    ],
+    compatible_with = get_compatible_with_portable(),
+    copts = [
+        "-Ithird_party",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:FuncDialect",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:TransformUtils",
+        "@llvm-project//mlir:Transforms",
+        "@local_xla//xla/mlir_hlo",
+    ],
+    alwayslink = 1,
+)
+
+cc_library(
+    name = "fuse_convolution_pass",
+    srcs = [
+        "transforms/mhlo_passes/fuse_convolution_pass.cc",
+    ],
+    hdrs = [
+        "transforms/stablehlo_passes.h",
+    ],
+    copts = [
+        "-Ithird_party",
+    ],
+    deps = [
+        ":passes_inc_gen",
+        "//tensorflow/compiler/mlir/lite:validators",
+        "//tensorflow/compiler/mlir/quantization/common:attrs_and_constraints",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:Dialect",
+        "@llvm-project//mlir:FuncDialect",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:ShapeDialect",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:TransformUtils",
+        "@llvm-project//mlir:Transforms",
+        "@local_xla//xla/mlir_hlo",
+    ],
+    alwayslink = 1,
 )
