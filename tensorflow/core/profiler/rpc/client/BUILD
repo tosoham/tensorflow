@@ -19,8 +19,8 @@ cc_library(
     deps = [
         "//tensorflow/core:lib",
         "//tensorflow/core:lib_internal",
-        "//tensorflow/core/profiler/protobuf:xplane_proto_cc",
         "@local_tsl//tsl/profiler/protobuf:profiler_service_proto_cc",
+        "@local_tsl//tsl/profiler/protobuf:xplane_proto_cc",
         "@local_xla//xla/tsl/profiler/rpc/client:save_profile",
     ],
 )
