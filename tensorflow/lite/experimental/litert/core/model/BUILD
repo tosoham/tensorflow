@@ -58,6 +58,7 @@ cc_test(
         "//tensorflow/lite/experimental/litert/c:litert_op_code",
         "//tensorflow/lite/experimental/litert/cc:litert_buffer_ref",
         "//tensorflow/lite/experimental/litert/core/util:flatbuffer_tools",
+        "//tensorflow/lite/experimental/litert/test:common",
         "//tensorflow/lite/experimental/litert/test:matchers",
         "//tensorflow/lite/schema:schema_fbs",
         "@com_google_absl//absl/strings:string_view",
