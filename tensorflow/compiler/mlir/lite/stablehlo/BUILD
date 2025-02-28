@@ -284,7 +284,6 @@ cc_library(
         ":fold_broadcast_pass",
         ":fuse_convolution_pass",
         ":legalize_stablehlo_custom_call_to_composite",
-        ":legalize_tf_xla_call_module_to_stablehlo_pass",
         ":optimize",
         ":rename_entrypoint_to_main",
         ":smuggle_disallowed_ops",
@@ -294,6 +293,7 @@ cc_library(
         ":unfold_splat_constant_pass",
         ":unfuse_batch_norm_pass",
         "//tensorflow/compiler/mlir/quantization/stablehlo:bridge_passes",
+        "//tensorflow/compiler/mlir/stablehlo:legalize_tf_xla_call_module_to_stablehlo_pass",
         "//tensorflow/compiler/mlir/tensorflow/transforms:tensorflow_passes",
         "//tensorflow/compiler/mlir/tensorflow/transforms:tf_saved_model_passes",
         "//tensorflow/compiler/mlir/tf2xla/transforms:tf_xla_passes",
@@ -1142,7 +1142,6 @@ tf_cc_binary(
         ":legalize_stablehlo_composite_to_tfl_custom",
         ":legalize_stablehlo_custom_call_to_composite",
         ":legalize_stablehlo_to_vhlo_pass",
-        ":legalize_tf_xla_call_module_to_stablehlo_pass",
         ":optimize",
         ":passes_inc_gen",
         ":prepare_hlo",
@@ -1157,6 +1156,7 @@ tf_cc_binary(
         ":uniform_quantized_stablehlo_to_tfl_pass",
         "//tensorflow/compiler/mlir:passes",
         "//tensorflow/compiler/mlir:tf_mlir_opt_main",
+        "//tensorflow/compiler/mlir/stablehlo:legalize_tf_xla_call_module_to_stablehlo_pass",
     ],
 )
 
