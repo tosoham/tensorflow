@@ -547,6 +547,7 @@ class ExecuteOpConversion final : public mlir::ConversionPattern {
       if (!op_kernel_runner.ok()) {
         LOG(ERROR) << "Failed to create op_kernel_runner for " << node_def_text
                    << " with error: " << op_kernel_runner.status();
+        return mlir::failure();
       }
 
       if (op_kernel_runner.ok() && (*op_kernel_runner)->IsAsync()) {

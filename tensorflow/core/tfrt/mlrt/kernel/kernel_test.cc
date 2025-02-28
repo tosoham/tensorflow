@@ -30,6 +30,7 @@ limitations under the License.
 #include "absl/synchronization/notification.h"
 #include "absl/types/span.h"
 #include "xla/tsl/lib/core/status_test_util.h"
+#include "xla/tsl/platform/status_matchers.h"
 #include "tensorflow/core/framework/device.h"
 #include "tensorflow/core/framework/tensor_testutil.h"
 #include "tensorflow/core/tfrt/fallback/device_with_custom_allocator.h"
@@ -48,6 +49,7 @@ limitations under the License.
 namespace tensorflow {
 namespace tf_mlrt {
 namespace {
+using ::testing::HasSubstr;
 
 struct TestOp : mlrt::KernelFrame {
   static constexpr char kName[] = "test";
@@ -175,6 +177,54 @@ TEST(KernelTest, CreateExecuteOp) {
 
   tensorflow::test::ExpectEqual(
       result.Get<tfrt_stub::FallbackTensor>().tensor(), expected);
+}
+
+TEST(KernelTest, CreateOpFailure) {
+  auto buffer = CreateExecutableForCreateExecuteOp("UnknownOp");
+
+  mlrt::bc::Executable executable(buffer.data());
+
+  mlrt::KernelRegistry registry;
+  RegisterTfMlrtKernels(registry);
+  mlrt::LoadedExecutable loaded_executable(executable, registry);
+
+  mlrt::ExecutionContext execution_context(&loaded_executable);
+
+  tensorflow::SessionOptions session_options;
+  tensorflow::FunctionDefLibrary fdef_lib;
+  TF_ASSERT_OK_AND_ASSIGN(auto fallback_state, tfrt_stub::FallbackState::Create(
+                                                   session_options, fdef_lib));
+
+  std::function<void(std::function<void()>)> runner =
+      [](const std::function<void()>& f) { f(); };
+  tfrt_stub::OpKernelRunnerTable runner_table;
+  tfd::FallbackResourceArray resource_array;
+  tfd::KernelFallbackCompatRequestState fallback_request_state(
+      &runner, &fallback_state->device_manager(), /*step_id=*/0, &runner_table,
+      &resource_array, /*user_intra_op_threadpool=*/nullptr,
+      /*model_metadata=*/std::nullopt,
+      &fallback_state->process_function_library_runtime());
+
+  tfrt::ResourceContext resource_context;
+
+  auto tf_context =
+      std::make_unique<Context>(&fallback_request_state, &resource_context);
+  execution_context.AddUserContext(std::move(tf_context));
+
+  int32_t input = 100;
+  tensorflow::Tensor input_tensor(input);
+  mlrt::Value arg(tfrt_stub::FallbackTensor(std::move(input_tensor)));
+  mlrt::Value result;
+
+  std::vector<uint8_t> last_uses = {true};
+  execution_context.Call(executable.functions()[0], last_uses,
+                         absl::MakeSpan(&arg, 1), absl::MakeSpan(&result, 1));
+  mlrt::Execute(execution_context);
+
+  EXPECT_THAT(execution_context.status(),
+              tsl::testing::StatusIs(
+                  absl::StatusCode::kInternal,
+                  HasSubstr("Fail to create OpKernelRunner for name:")));
 }
 
 mlrt::bc::Buffer CreateExecutableForCreateExecuteOpCustomDevice(
